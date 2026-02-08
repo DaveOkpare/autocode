@@ -174,7 +174,13 @@ if __name__ == "__main__":
             _result = False
             if approval.tool_name == "approve":
                 response = input(
-                    f"{approval.args.get('plan') if isinstance(approval.args, dict) else approval.args}"
+                    f"{
+                        approval.args.get('plan')
+                        if isinstance(approval.args, dict)
+                        else json.loads(approval.args if approval.args else '').get(
+                            'plan', ''
+                        )
+                    }"
                 )
                 if response.lower() == "no":
                     rejections = input("What should we do instead?")
