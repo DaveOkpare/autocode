@@ -25,10 +25,9 @@ def planning_response_to_markdown(plan: Plan) -> str:
         for table in plan.database_schema:
             md += f"### {table.name}\n"
             for col in table.columns:
-                constraints = col.get("constraints", "")
-                md += f"- **{col['name']}**: {col['type']}"
-                if constraints:
-                    md += f" ({constraints})"
+                md += f"- **{col.name}**: {col.type}"
+                if col.constraints:
+                    md += f" ({col.constraints})"
                 md += "\n"
             md += "\n"
 

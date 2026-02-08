@@ -3,10 +3,21 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class Column(BaseModel):
+    name: str = Field(description="Column name (e.g., 'id', 'email', 'created_at')")
+    type: str = Field(
+        description="Column data type (e.g., 'VARCHAR(255)', 'INTEGER', 'TIMESTAMP', 'BOOLEAN')"
+    )
+    constraints: Optional[str] = Field(
+        default=None,
+        description="Optional column constraints (e.g., 'PRIMARY KEY', 'NOT NULL', 'UNIQUE', 'FOREIGN KEY')",
+    )
+
+
 class DBTable(BaseModel):
     name: str = Field(description="The database table name (e.g., 'users', 'orders')")
-    columns: list[dict[str, str]] = Field(
-        description="List of column definitions. Each dict must have 'name' (column name) and 'type' (data type, e.g., 'VARCHAR(255)', 'INTEGER', 'TIMESTAMP'). May include optional 'constraints' key (e.g., 'PRIMARY KEY', 'NOT NULL', 'UNIQUE')."
+    columns: list[Column] = Field(
+        description="List of column definitions with name, type, and optional constraints"
     )
 
 
