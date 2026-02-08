@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
-from typing import Optional
 
-from pydantic import BaseModel, Field
 from pydantic_ai import (
     Agent,
     DeferredToolRequests,
@@ -11,109 +9,9 @@ from pydantic_ai import (
     ToolDenied,
 )
 
-
-class DBTable(BaseModel):
-    name: str = Field(description="The database table name (e.g., 'users', 'orders')")
-    columns: list[dict[str, str]] = Field(
-        description="List of column definitions. Each dict must have 'name' (column name) and 'type' (data type, e.g., 'VARCHAR(255)', 'INTEGER', 'TIMESTAMP'). May include optional 'constraints' key (e.g., 'PRIMARY KEY', 'NOT NULL', 'UNIQUE')."
-    )
-
-
-class APIEndpoint(BaseModel):
-    path: str = Field(
-        description="The API endpoint path (e.g., '/api/users', '/api/auth/login')"
-    )
-    method: str = Field(description="The HTTP method (GET, POST, PUT, PATCH, DELETE)")
-
-
-class Interaction(BaseModel):
-    feature: str = Field(
-        description="The specific feature name to be tested (e.g., 'User Registration', 'Shopping Cart Checkout')"
-    )
-    workflow: list[str] = Field(
-        description="Step-by-step testing workflow from user perspective. Each step should be actionable (e.g., '1. Navigate to /signup', '2. Fill in email field', '3. Click submit button', '4. Verify success message appears')"
-    )
-
-
-class Implementation(BaseModel):
-    task_name: str = Field(
-        description="Descriptive name of the implementation task (e.g., 'Setup Database Schema', 'Implement User Authentication API')"
-    )
-    implementation_steps: list[str] = Field(
-        description="Ordered list of concrete implementation steps. Each step must be specific and actionable (e.g., '1. Install bcrypt package for password hashing', '2. Create User model in models/user.py with email and password_hash fields', '3. Implement POST /api/auth/register endpoint')"
-    )
-
-
-class Plan(BaseModel):
-    overview: str = Field(
-        description="Concise project overview (2-4 sentences). State what the system does, who it's for, and its primary value proposition."
-    )
-    technology_stack: str = Field(
-        description="Complete technology stack specification organized by category. Include specific versions where critical. Example format: 'Frontend: React 18, TypeScript 5.x, Tailwind CSS | Backend: Python 3.11, FastAPI | Database: PostgreSQL 15 | Auth: JWT tokens | Deployment: Docker, AWS'. Adapt categories to project needs."
-    )
-    prerequisites: list[str] = Field(
-        description="Environment setup requirements before development can begin. Include: software installations (Node.js 18+, Python 3.11+), account setups (GitHub, cloud provider), API keys needed, and system requirements. Be specific with versions."
-    )
-    core_features: list[str] = Field(
-        description="List of essential features that define the system's functionality. Each feature should be user-facing and clearly describe what users can do (e.g., 'User registration and authentication', 'Create and manage product listings', 'Real-time chat between users')."
-    )
-    database_schema: Optional[list[DBTable]] = Field(
-        default=None,
-        description="Database schema specification. Include all tables with columns, data types, and constraints. Omit only if the project genuinely requires no database (static sites, pure frontend apps).",
-    )
-    api_endpoints_summary: Optional[list[APIEndpoint]] = Field(
-        default=None,
-        description="Complete list of API endpoints with paths and HTTP methods. Omit only if there's no backend API (static sites, pure frontend apps).",
-    )
-    ui_layout: Optional[list[str]] = Field(
-        default=None,
-        description="UI component structure and page layouts. List all major views/pages and their key components (e.g., 'Login page: email input, password input, submit button, forgot password link', 'Dashboard: sidebar navigation, header with user menu, main content area'). Omit only for backend-only projects.",
-    )
-    design_system: Optional[list[str]] = Field(
-        default=None,
-        description="Design system specifications: color palette, typography, spacing scale, component variants, and styling approach (CSS-in-JS, Tailwind, CSS modules). Omit only for backend-only projects.",
-    )
-    key_interactions: list[Interaction] = Field(
-        description="Critical user workflows to test the system. Define end-to-end scenarios that verify core functionality works correctly. Include for any project with user-facing features.",
-    )
-    implementation_steps: list[Implementation] = Field(
-        description="Ordered implementation phases breaking down the project into manageable tasks. Each task should have concrete, actionable steps. Essential for projects requiring staged development.",
-    )
-    success_criteria: list[str] = Field(
-        description="Measurable criteria that define project completion. Include functional requirements (all features work), quality requirements (test coverage, performance), and user experience requirements (responsive design, accessibility). Be specific and testable.",
-    )
-
-
-planning_instruction = """
-## YOUR ROLE - PLANNING AGENT
-
-You are a software architect and planning specialist tasked with creating comprehensive implementation plans for LONG-RUNNING AUTONOMOUS DEVELOPMENT PROCESSES.
-
-### CRITICAL REQUIREMENTS
-
-**This plan will be executed by autonomous agents with NO human intervention after approval.**
-
-Your plan must be:
-1. **Complete**: Capture every element of the user's requirements
-2. **Detailed**: Include specific technical decisions, not vague descriptions
-3. **Unambiguous**: Clear enough that an agent can implement without clarification
-4. **Structured**: Organized logically with implementation steps, success criteria, and testing workflows
-
-### AVAILABLE TOOLS
-
-You have access to:
-- `ask_followup`: Ask clarifying questions BEFORE finalizing the plan
-- `approve`: Present the complete plan summary for user review and approval. This should be a digestible overview that accurately represents the final detailed plan.
-
-### YOUR PROCESS
-
-1. **Clarify First**: Use `ask_followup` to resolve any ambiguities in requirements
-2. **Design Completely**: Create a detailed plan covering all aspects (tech stack, schema, endpoints, UI, workflows)
-3. **Specify Implementation**: Break down into actionable steps with clear success criteria
-4. **Seek Approval**: Present the final plan for user confirmation
-
-**Remember**: Autonomous agents will execute this plan independently. Every detail matters.
-"""
+from prompts import planning_instruction
+from schemas import Plan
+from utils import planning_response_to_markdown
 
 planning_agent = Agent(
     model="openai:gpt-5-mini",
@@ -158,82 +56,6 @@ def approve(plan: str) -> str:
               Keep it digestible (1-2 pages max) while accurately representing the full detailed plan.
     """
     return "The user has approved the plan."
-
-
-def planning_response_to_markdown(plan: Plan) -> str:
-    """Convert a Plan to markdown format."""
-    md = "# Project Specification\n\n"
-    md += f"## Overview\n{plan.overview}\n\n"
-    md += f"## Tech Stack\n{plan.technology_stack}\n\n"
-
-    # Prerequisites
-    md += "## Prerequisites\n"
-    for req in plan.prerequisites:
-        md += f"- {req}\n"
-    md += "\n"
-
-    # Core Features
-    md += "## Core Features\n"
-    for feat in plan.core_features:
-        md += f"- {feat}\n"
-    md += "\n"
-
-    # Database Schema
-    if plan.database_schema:
-        md += "## Database Schema\n"
-        for table in plan.database_schema:
-            md += f"### {table.name}\n"
-            for col in table.columns:
-                constraints = col.get("constraints", "")
-                md += f"- **{col['name']}**: {col['type']}"
-                if constraints:
-                    md += f" ({constraints})"
-                md += "\n"
-            md += "\n"
-
-    # API Endpoints
-    if plan.api_endpoints_summary:
-        md += "## API Endpoints\n"
-        for endpoint in plan.api_endpoints_summary:
-            md += f"- `{endpoint.method} {endpoint.path}`\n"
-        md += "\n"
-
-    # UI Layout
-    if plan.ui_layout:
-        md += "## UI Layout\n"
-        for layout in plan.ui_layout:
-            md += f"- {layout}\n"
-        md += "\n"
-
-    # Design System
-    if plan.design_system:
-        md += "## Design System\n"
-        for design in plan.design_system:
-            md += f"- {design}\n"
-        md += "\n"
-
-    # Key Interactions
-    md += "## Key Interactions\n"
-    for interaction in plan.key_interactions:
-        md += f"### {interaction.feature}\n"
-        for step in interaction.workflow:
-            md += f"- {step}\n"
-        md += "\n"
-
-    # Implementation Steps
-    md += "## Implementation Steps\n"
-    for impl in plan.implementation_steps:
-        md += f"### {impl.task_name}\n"
-        for step in impl.implementation_steps:
-            md += f"- {step}\n"
-        md += "\n"
-
-    # Success Criteria
-    md += "## Success Criteria\n"
-    for criteria in plan.success_criteria:
-        md += f"- {criteria}\n"
-
-    return md
 
 
 def run_planning_agent(request, project_dir: Path):
