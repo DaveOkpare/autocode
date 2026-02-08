@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -235,7 +236,7 @@ def planning_response_to_markdown(plan: Plan) -> str:
     return md
 
 
-def run_planning_agent(request):
+def run_planning_agent(request, project_dir: Path):
     """Present the complete implementation plan to the user for approval."""
     result = planning_agent.run_sync(request)
     output = result.output
@@ -285,3 +286,14 @@ def run_planning_agent(request):
         )
         messages = output.all_messages()
         output = output.output
+
+    # Convert the plan to markdown format
+    markdown_plan = planning_response_to_markdown(output)
+
+    if not project_dir.exists():
+        project_dir.mkdir(parents=True)
+
+    # Save the markdown plan to a file
+    plan_file = project_dir / "plan.md"
+    with open(plan_file, "w") as f:
+        f.write(markdown_plan)
