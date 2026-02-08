@@ -72,16 +72,13 @@ class Plan(BaseModel):
         default=None,
         description="Design system specifications: color palette, typography, spacing scale, component variants, and styling approach (CSS-in-JS, Tailwind, CSS modules). Omit only for backend-only projects.",
     )
-    key_interactions: Optional[list[Interaction]] = Field(
-        default=None,
+    key_interactions: list[Interaction] = Field(
         description="Critical user workflows to test the system. Define end-to-end scenarios that verify core functionality works correctly. Include for any project with user-facing features.",
     )
-    implementation_steps: Optional[list[Implementation]] = Field(
-        default=None,
+    implementation_steps: list[Implementation] = Field(
         description="Ordered implementation phases breaking down the project into manageable tasks. Each task should have concrete, actionable steps. Essential for projects requiring staged development.",
     )
-    success_criteria: Optional[list[str]] = Field(
-        default=None,
+    success_criteria: list[str] = Field(
         description="Measurable criteria that define project completion. Include functional requirements (all features work), quality requirements (test coverage, performance), and user experience requirements (responsive design, accessibility). Be specific and testable.",
     )
 
@@ -162,14 +159,92 @@ def approve(plan: str) -> str:
     return "The user has approved the plan."
 
 
-if __name__ == "__main__":
-    request = input("What are we building?\n\n")
+def planning_response_to_markdown(plan: Plan) -> str:
+    """Convert a Plan to markdown format."""
+    md = "# Project Specification\n\n"
+    md += f"## Overview\n{plan.overview}\n\n"
+    md += f"## Tech Stack\n{plan.technology_stack}\n\n"
+
+    # Prerequisites
+    md += "## Prerequisites\n"
+    for req in plan.prerequisites:
+        md += f"- {req}\n"
+    md += "\n"
+
+    # Core Features
+    md += "## Core Features\n"
+    for feat in plan.core_features:
+        md += f"- {feat}\n"
+    md += "\n"
+
+    # Database Schema
+    if plan.database_schema:
+        md += "## Database Schema\n"
+        for table in plan.database_schema:
+            md += f"### {table.name}\n"
+            for col in table.columns:
+                constraints = col.get("constraints", "")
+                md += f"- **{col['name']}**: {col['type']}"
+                if constraints:
+                    md += f" ({constraints})"
+                md += "\n"
+            md += "\n"
+
+    # API Endpoints
+    if plan.api_endpoints_summary:
+        md += "## API Endpoints\n"
+        for endpoint in plan.api_endpoints_summary:
+            md += f"- `{endpoint.method} {endpoint.path}`\n"
+        md += "\n"
+
+    # UI Layout
+    if plan.ui_layout:
+        md += "## UI Layout\n"
+        for layout in plan.ui_layout:
+            md += f"- {layout}\n"
+        md += "\n"
+
+    # Design System
+    if plan.design_system:
+        md += "## Design System\n"
+        for design in plan.design_system:
+            md += f"- {design}\n"
+        md += "\n"
+
+    # Key Interactions
+    md += "## Key Interactions\n"
+    for interaction in plan.key_interactions:
+        md += f"### {interaction.feature}\n"
+        for step in interaction.workflow:
+            md += f"- {step}\n"
+        md += "\n"
+
+    # Implementation Steps
+    md += "## Implementation Steps\n"
+    for impl in plan.implementation_steps:
+        md += f"### {impl.task_name}\n"
+        for step in impl.implementation_steps:
+            md += f"- {step}\n"
+        md += "\n"
+
+    # Success Criteria
+    md += "## Success Criteria\n"
+    for criteria in plan.success_criteria:
+        md += f"- {criteria}\n"
+
+    return md
+
+
+def run_planning_agent(request):
+    """Present the complete implementation plan to the user for approval."""
     result = planning_agent.run_sync(request)
     output = result.output
     messages = result.all_messages()
+
     while isinstance(output, DeferredToolRequests):
         results = DeferredToolResults()
         approvals = output.approvals
+
         for approval in approvals:
             _result = False
             if approval.tool_name == "approve":
@@ -200,7 +275,9 @@ if __name__ == "__main__":
                 )
                 response = input(f"{questions_text}\n\n")
                 _result = ToolApproved(override_args={"answers": response})
+
             results.approvals[approval.tool_call_id] = _result
+
         output = planning_agent.run_sync(
             "Now continue with the user's feedback",
             message_history=messages,
@@ -208,4 +285,3 @@ if __name__ == "__main__":
         )
         messages = output.all_messages()
         output = output.output
-    print("Plan:", output)
