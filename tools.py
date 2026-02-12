@@ -79,15 +79,24 @@ class Tools:
             with open(filepath, "r+") as f:
                 content = f.read()
                 f.seek(0)
-                f.write(content.replace(old_str, new_str))
+                new_content = content.replace(old_str, new_str)
+                if new_content == content:
+                    return "Warning: No changes made to the file"
+                f.write(new_content)
                 f.truncate()
             return "File edited successfully"
         except Exception as e:
             return f"ERROR: {str(e)}"
 
     def search_files(self, pattern: str, path: str = "."):
+        exclude = [
+            "--exclude-dir=.venv",
+            "--exclude-dir=.git",
+            "--exclude-dir=__pycache__",
+        ]
+        cmd = f"grep -r '{pattern}' '{path}' {' '.join(exclude)}"
         try:
-            result = self._session.execute(f"grep -r '{pattern}' '{path}'")
+            result = self._session.execute(cmd)
             return result.splitlines()
         except Exception as e:
             return f"ERROR: {str(e)}"
