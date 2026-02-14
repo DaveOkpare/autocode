@@ -227,3 +227,37 @@ class Tools:
         usage_info = self._get_usage_info(ctx)
         result = self._session.execute(command, timeout)
         return usage_info + result
+
+    def ask_followup(self, questions: list[str]) -> str:
+        """Ask clarifying questions to resolve ambiguities in the user's requirements.
+        Limit questions to 3 per call to avoid overwhelming the user.
+
+        Use this tool when:
+        - Requirements are unclear or missing critical details
+        - Multiple technical approaches are possible and user preference is needed
+        - Scope boundaries are undefined
+
+        Args:
+            questions: A list of specific questions to ask the user. Each question should target a single clarification point.
+        """
+        return "The user has clarified their requirements."
+
+    def approve(self, plan: str) -> str:
+        """Present the complete implementation plan to the user for approval.
+
+        Use this tool when:
+        - All ambiguities have been resolved
+        - The plan is comprehensive and ready for autonomous execution
+        - You need user confirmation before finalizing
+
+        Args:
+            plan: A concise, well-structured summary of the complete plan. Include:
+                  - Project overview and goals
+                  - Technology stack decisions
+                  - Key architectural decisions
+                  - Core features and implementation approach
+                  - Major milestones or phases
+
+                  Keep it digestible (1-2 pages max) while accurately representing the full detailed plan.
+        """
+        return "The user has approved the plan."
