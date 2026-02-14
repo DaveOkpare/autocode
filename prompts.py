@@ -50,18 +50,15 @@ This is a long task spanning many sessions, so use your full budget productively
 </context_awareness>
 
 <tools>
-You have six tools. Use the right one for the job:
+You have three tools:
 
-| Instead of             | Use                          |
-|------------------------|------------------------------|
-| `execute("cat ...")`   | `read_file(filepath)`        |
-| `execute("echo >")`    | `write_file(filepath, content)` |
-| `execute("sed ...")`   | `edit_file(filepath, old, new)` |
-| `execute("find ...")`  | `list_files(dir, pattern)`   |
-| `execute("grep ...")`  | `search_files(pattern, path)` |
-| git, pip, servers      | `execute(command)`           |
+| Tool                          | Purpose                                |
+|-------------------------------|----------------------------------------|
+| `read_file(filepath)`         | Read file contents (e.g., app_spec.md) |
+| `write_file(filepath, content)` | Create new files                     |
+| `execute(command)`            | Run shell commands (git, chmod, etc.)  |
 
-Always read a file before editing it. Call independent tools in parallel.
+That's it. You are setting up — not implementing. Use `write_file` to create files, `execute` for git and shell commands.
 </tools>
 
 ### FIRST: Read the Project Specification
@@ -95,22 +92,11 @@ From this point forward, commit after every completed task.
 
 Create the directories and config files the spec calls for. Commit separately.
 
-### TASK 5: Begin Implementation
-
-If budget remains, start on the highest-priority pending task. Work on one at a time:
-1. Set its status to `in_progress` in progress.json.
-2. Build it.
-3. Verify it works.
-4. Set its status to `completed`. Mark related tests `passes: true`.
-5. Commit.
-
-Repeat until your budget requires you to stop.
-
 ### ENDING THE SESSION
 
-Before your budget runs out:
+After setting up the project structure:
 1. Commit everything.
-2. Update progress.json — add YOUR session entry to `sessions` and write `next_session_notes` telling the next agent exactly where to pick up.
+2. Update progress.json — add YOUR session entry to `sessions` and write `next_session_notes` telling the next coding agent exactly where to pick up.
 3. Verify with `execute("git status")` that nothing is left uncommitted.
 
 <rules>

@@ -9,12 +9,15 @@ from pydantic_ai import (
     ToolDenied,
 )
 
-from prompts import planning_instruction
+from prompts import coding_instruction, initializer_instruction, planning_instruction
 from schemas import Plan
+from tools import Tools
 from utils import planning_response_to_markdown
 
+model = "openai:gpt-5-mini"
+
 planning_agent = Agent(
-    model="openai:gpt-5-mini",
+    model=model,
     instructions=planning_instruction,
     output_type=Plan | DeferredToolRequests,
 )
@@ -116,6 +119,27 @@ def run_planning_agent(request, project_dir: Path):
         project_dir.mkdir(parents=True)
 
     # Save the markdown plan to a file
-    plan_file = project_dir / "plan.md"
+    plan_file = project_dir / "app_spec.md"
     with open(plan_file, "w") as f:
         f.write(markdown_plan)
+
+
+initializer_agent = Agent(
+    instructions=initializer_instruction,
+    model=model,
+    tools=[Tools.read_file, Tools.write_file, Tools.execute],
+)
+
+coding_agent = Agent(
+    instructions=coding_instruction,
+    model=model,
+    tools=[
+        Tools.read_file,
+        Tools.write_file,
+        Tools.execute,
+        Tools.edit_file,
+        Tools.list_files,
+        Tools.search_files,
+    ],
+    model_settings={"parallel_tool_calls": True},
+)
