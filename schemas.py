@@ -84,3 +84,9 @@ class Plan(BaseModel):
     success_criteria: list[str] = Field(
         description="Measurable criteria that define project completion. Include functional requirements (all features work), quality requirements (test coverage, performance), and user experience requirements (responsive design, accessibility). Be specific and testable.",
     )
+
+
+class AgentDeps(BaseModel):
+    context_window_size: int = Field(
+        description="Maximum number of tokens the agent can process at once. This is typically the maximum context size of the model.",
+    )

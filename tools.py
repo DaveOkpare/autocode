@@ -5,6 +5,8 @@ from pathlib import Path
 
 from pydantic_ai import RunContext
 
+from schemas import AgentDeps
+
 
 class BashSession:
     def __init__(self):
@@ -47,7 +49,7 @@ class Tools:
     def __init__(self, session: BashSession):
         self._session = session
 
-    def _should_include_usage(self, ctx: RunContext) -> bool:
+    def _should_include_usage(self, ctx: RunContext[AgentDeps]) -> bool:
         """Check if usage info should be included (exclude for Claude 4.5+)."""
         model_name = str(ctx.model).lower()
         # Exclude Claude 4.5 and later versions
@@ -60,13 +62,16 @@ class Tools:
                     return False
         return True
 
-    def _get_usage_info(self, ctx: RunContext) -> str:
+    def _get_usage_info(self, ctx: RunContext[AgentDeps]) -> str:
         """Get usage info in XML format if applicable."""
         if not self._should_include_usage(ctx):
             return ""
-        return f"<system_warning>Token usage: {ctx.usage.total_tokens} total tokens</system_warning>\n"
+        used = ctx.usage.total_tokens
+        total = ctx.deps.context_window_size
+        remaining = ((total - used) / total) * 100
+        return f"<system_warning>Token usage: {used}/{total}; {remaining:.2f}% remaining</system_warning>\n"
 
-    def read_file(self, ctx: RunContext, filepath: str):
+    def read_file(self, ctx: RunContext[AgentDeps], filepath: str):
         """Read the full contents of a file from the filesystem.
 
         Use this to inspect source code, configuration, or any text file before making changes.
@@ -89,7 +94,7 @@ class Tools:
         except Exception as e:
             return usage_info + f"ERROR: {str(e)}"
 
-    def write_file(self, ctx: RunContext, filepath: str, content: str):
+    def write_file(self, ctx: RunContext[AgentDeps], filepath: str, content: str):
         """Create or overwrite a file with the given content.
 
         WARNING: This overwrites the entire file. Always read_file first to avoid losing
@@ -113,7 +118,7 @@ class Tools:
 
     def list_files(
         self,
-        ctx: RunContext,
+        ctx: RunContext[AgentDeps],
         directory: str = ".",
         pattern: str = "*",
     ):
@@ -140,7 +145,9 @@ class Tools:
         result = "\n".join(files) if files else "No files found"
         return usage_info + result
 
-    def edit_file(self, ctx: RunContext, filepath: str, old_str: str, new_str: str):
+    def edit_file(
+        self, ctx: RunContext[AgentDeps], filepath: str, old_str: str, new_str: str
+    ):
         """Replace a specific string in a file with new content.
 
         Use this for targeted edits instead of rewriting the entire file with write_file.
@@ -172,7 +179,7 @@ class Tools:
         except Exception as e:
             return usage_info + f"ERROR: {str(e)}"
 
-    def search_files(self, ctx: RunContext, pattern: str, path: str = "."):
+    def search_files(self, ctx: RunContext[AgentDeps], pattern: str, path: str = "."):
         """Search file contents for a text pattern using grep.
 
         Use this to find where a function, variable, string, or pattern is used across
@@ -201,7 +208,9 @@ class Tools:
         except Exception as e:
             return usage_info + f"ERROR: {str(e)}"
 
-    def execute(self, ctx: RunContext, command: str, timeout: float = 10.0) -> str:
+    def execute(
+        self, ctx: RunContext[AgentDeps], command: str, timeout: float = 10.0
+    ) -> str:
         """Run a shell command and return its output.
 
         Use this for system operations like git, pip, running scripts, or other terminal
