@@ -20,13 +20,13 @@ class BashSession:
         )
 
     def execute(self, command: str, timeout: float = 10.0) -> str:
-        self.proc.stdin.write(f"{command}; echo '__DONE__'\n")
-        self.proc.stdin.flush()
+        self.proc.stdin.write(f"{command}; echo '__DONE__'\n")  # pyright: ignore[reportOptionalMemberAccess]
+        self.proc.stdin.flush()  # pyright: ignore[reportOptionalMemberAccess]
         output = []
 
         def read_output():
             while True:
-                line = self.proc.stdout.readline()
+                line = self.proc.stdout.readline()  # pyright: ignore[reportOptionalMemberAccess]
                 if not line:
                     break
                 output.append(line)
