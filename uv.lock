@@ -177,11 +177,15 @@ name = "autonomous-coding"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "logfire" },
     { name = "pydantic-ai" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pydantic-ai", specifier = ">=1.56.0" }]
+requires-dist = [
+    { name = "logfire", specifier = ">=4.22.0" },
+    { name = "pydantic-ai", specifier = ">=1.56.0" },
+]
 
 [[package]]
 name = "beartype"
