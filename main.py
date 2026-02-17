@@ -17,7 +17,8 @@ console = Console()
 
 
 async def planning_step():
-    project_path = Path.cwd() / "project"
+    project_path = Path("project")
+    project_path.mkdir(parents=True, exist_ok=True)
     plan_file_path = project_path / "app_spec.md"
 
     user_input = await questionary.text("Enter your project description: ").ask_async()
@@ -34,7 +35,7 @@ async def planning_step():
 
             if call.tool_name == "approve":
                 _questions = call.args_as_dict().get("plan", "")
-                console.print(_questions)
+                console.print("\n" + _questions, markup=True)
                 choice = await questionary.select(
                     "Do you approve this plan? ", choices=["Yes", "No"]
                 ).ask_async()
@@ -75,7 +76,9 @@ async def planning_step():
         output = result.output
 
     if isinstance(output, Plan):
-        print("Writing project specification to app_spec.md...")
+        console.print(
+            f"[bold green]Writing project specification to {plan_file_path}...[/bold green]"
+        )
         plan = format_plan_to_markdown(output)
         with open(plan_file_path, "w") as f:
             f.write(plan)
