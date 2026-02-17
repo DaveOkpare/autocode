@@ -1,7 +1,7 @@
 from schemas import Plan
 
 
-def planning_response_to_markdown(plan: Plan) -> str:
+def format_plan_to_markdown(plan: Plan) -> str:
     """Convert a Plan to markdown format."""
     md = "# Project Specification\n\n"
     md += f"## Overview\n{plan.overview}\n\n"
