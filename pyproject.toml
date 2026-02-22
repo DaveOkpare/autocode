@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "logfire>=4.22.0",
+    "pydantic-ai-backend[docker]>=0.1.7",
     "pydantic-ai>=1.56.0",
     "questionary>=2.1.1",
     "rich>=14.3.2",
