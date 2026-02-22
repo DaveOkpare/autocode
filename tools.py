@@ -4,8 +4,12 @@ import threading
 from pathlib import Path
 
 from pydantic_ai import RunContext
+from pydantic_ai_backends import DockerSandbox
 
 from schemas import AgentDeps
+
+sandbox = DockerSandbox(runtime="python-datascience")
+sandbox.start()
 
 
 class BashSession:
@@ -46,8 +50,9 @@ class BashSession:
 
 
 class Tools:
-    def __init__(self, session: BashSession):
+    def __init__(self, session: BashSession, sandbox: DockerSandbox | None = None):
         self._session = session
+        self._sandbox = sandbox
 
     def _should_include_usage(self, ctx: RunContext[AgentDeps]) -> bool:
         """Check if usage info should be included (exclude for Claude 4.5+)."""
@@ -71,7 +76,13 @@ class Tools:
         remaining = ((total - used) / total) * 100
         return f"<system_warning>Token usage: {used}/{total}; {remaining:.2f}% remaining</system_warning>\n"
 
-    def read_file(self, ctx: RunContext[AgentDeps], filepath: str):
+    def read_file(
+        self,
+        ctx: RunContext[AgentDeps],
+        filepath: str,
+        offset: int = 0,
+        limit: int = 2000,
+    ):
         """Read the full contents of a file from the filesystem.
 
         Use this to inspect source code, configuration, or any text file before making changes.
@@ -79,20 +90,33 @@ class Tools:
         Args:
             ctx: The run context containing usage info.
             filepath: Absolute or relative path to the file to read.
+            offset: Start line index (for pagination). Defaults to 0.
+            limit: Maximum number of lines to return. Defaults to 2000.
 
         Returns:
             The file contents as a string, "FILE_NOT_FOUND" if the path doesn't exist,
             or "ERROR: <message>" on failure.
         """
         usage_info = self._get_usage_info(ctx)
-        try:
-            with open(filepath, "r") as file:
-                content = file.read()
-            return usage_info + content
-        except FileNotFoundError:
-            return usage_info + "FILE_NOT_FOUND"
-        except Exception as e:
-            return usage_info + f"ERROR: {str(e)}"
+
+        # Use sandbox if available
+        if self._sandbox:
+            try:
+                content = self._sandbox.read(filepath, offset, limit)
+                return usage_info + content
+            except FileNotFoundError:
+                return usage_info + "FILE_NOT_FOUND"
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
+        else:
+            try:
+                with open(filepath, "r") as file:
+                    content = file.read()
+                return usage_info + content
+            except FileNotFoundError:
+                return usage_info + "FILE_NOT_FOUND"
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
 
     def write_file(self, ctx: RunContext[AgentDeps], filepath: str, content: str):
         """Create or overwrite a file with the given content.
@@ -109,12 +133,21 @@ class Tools:
             "File written successfully" on success, or "ERROR: <message>" on failure.
         """
         usage_info = self._get_usage_info(ctx)
-        try:
-            with open(filepath, "w") as file:
-                file.write(content)
-            return usage_info + "File written successfully"
-        except Exception as e:
-            return usage_info + f"ERROR: {str(e)}"
+
+        # Use sandbox if available
+        if self._sandbox:
+            try:
+                self._sandbox.write(filepath, content)
+                return usage_info + "File written successfully"
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
+        else:
+            try:
+                with open(filepath, "w") as file:
+                    file.write(content)
+                return usage_info + "File written successfully"
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
 
     def list_files(
         self,
@@ -136,17 +169,34 @@ class Tools:
             A list of matching file paths as strings with usage info appended.
         """
         usage_info = self._get_usage_info(ctx)
-        exclude = {".venv", "__pycache__", ".git"}
-        files = [
-            str(f)
-            for f in Path(directory).rglob(pattern)
-            if not any(part in exclude for part in f.parts) and f.is_file()
-        ]
-        result = "\n".join(files) if files else "No files found"
-        return usage_info + result
+
+        # Use sandbox if available
+        if self._sandbox:
+            try:
+                files = self._sandbox.glob_info(pattern, directory)
+                result = (
+                    "\n".join([str(f) for f in files]) if files else "No files found"
+                )
+                return usage_info + result
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
+        else:
+            exclude = {".venv", "__pycache__", ".git"}
+            files = [
+                str(f)
+                for f in Path(directory).rglob(pattern)
+                if not any(part in exclude for part in f.parts) and f.is_file()
+            ]
+            result = "\n".join(files) if files else "No files found"
+            return usage_info + result
 
     def edit_file(
-        self, ctx: RunContext[AgentDeps], filepath: str, old_str: str, new_str: str
+        self,
+        ctx: RunContext[AgentDeps],
+        filepath: str,
+        old_str: str,
+        new_str: str,
+        replace_all: bool = False,
     ):
         """Replace a specific string in a file with new content.
 
@@ -159,6 +209,7 @@ class Tools:
             filepath: Path to the file to edit.
             old_str: The exact text to find and replace. Must match file content exactly.
             new_str: The replacement text.
+            replace_all: If True, replace all occurrences. If False, only replace first.
 
         Returns:
             "File edited successfully" on success,
@@ -166,18 +217,27 @@ class Tools:
             or "ERROR: <message>" on failure.
         """
         usage_info = self._get_usage_info(ctx)
-        try:
-            with open(filepath, "r+") as f:
-                content = f.read()
-                f.seek(0)
-                new_content = content.replace(old_str, new_str)
-                if new_content == content:
-                    return usage_info + "Warning: No changes made to the file"
-                f.write(new_content)
-                f.truncate()
-            return usage_info + "File edited successfully"
-        except Exception as e:
-            return usage_info + f"ERROR: {str(e)}"
+
+        # Use sandbox if available
+        if self._sandbox:
+            try:
+                self._sandbox.edit(filepath, old_str, new_str, replace_all)
+                return usage_info + "File edited successfully"
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
+        else:
+            try:
+                with open(filepath, "r+") as f:
+                    content = f.read()
+                    f.seek(0)
+                    new_content = content.replace(old_str, new_str)
+                    if new_content == content:
+                        return usage_info + "Warning: No changes made to the file"
+                    f.write(new_content)
+                    f.truncate()
+                return usage_info + "File edited successfully"
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
 
     def search_files(self, ctx: RunContext[AgentDeps], pattern: str, path: str = "."):
         """Search file contents for a text pattern using grep.
@@ -194,19 +254,35 @@ class Tools:
             A list of matching lines in "filepath:line" format, or "ERROR: <message>" on failure.
         """
         usage_info = self._get_usage_info(ctx)
-        exclude = [
-            "--exclude-dir=.venv",
-            "--exclude-dir=.git",
-            "--exclude-dir=__pycache__",
-        ]
-        cmd = f"grep -r '{pattern}' '{path}' {' '.join(exclude)}"
-        try:
-            result = self._session.execute(cmd)
-            result_lines = result.splitlines()
-            result_str = "\n".join(result_lines) if result_lines else "No matches found"
-            return usage_info + result_str
-        except Exception as e:
-            return usage_info + f"ERROR: {str(e)}"
+
+        # Use sandbox if available
+        if self._sandbox:
+            try:
+                result = self._sandbox.grep_raw(pattern, path)
+                result_str = (
+                    "\n".join([str(line) for line in result])
+                    if isinstance(result, list)
+                    else result
+                )
+                return usage_info + result_str
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
+        else:
+            exclude = [
+                "--exclude-dir=.venv",
+                "--exclude-dir=.git",
+                "--exclude-dir=__pycache__",
+            ]
+            cmd = f"grep -r '{pattern}' '{path}' {' '.join(exclude)}"
+            try:
+                result = self._session.execute(cmd)
+                result_lines = result.splitlines()
+                result_str = (
+                    "\n".join(result_lines) if result_lines else "No matches found"
+                )
+                return usage_info + result_str
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
 
     def execute(
         self, ctx: RunContext[AgentDeps], command: str, timeout: float = 10.0
@@ -225,8 +301,17 @@ class Tools:
             Command stdout as a string, or "TIMEOUT" if the command exceeded the time limit.
         """
         usage_info = self._get_usage_info(ctx)
-        result = self._session.execute(command, timeout)
-        return usage_info + result
+
+        # Use sandbox if available, otherwise fall back to BashSession
+        if self._sandbox:
+            try:
+                result = self._sandbox.execute(command, int(timeout))
+                return usage_info + result.output
+            except Exception as e:
+                return usage_info + f"ERROR: {str(e)}"
+        else:
+            result = self._session.execute(command, timeout)
+            return usage_info + result
 
     def ask_followup(self, questions: list[str]) -> str:
         """Ask clarifying questions to resolve ambiguities in the user's requirements.
